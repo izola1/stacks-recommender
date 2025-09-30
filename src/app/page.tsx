@@ -1,95 +1,81 @@
-import Image from "next/image";
+"use client";
+import { useState, useEffect } from "react";
 import styles from "./page.module.css";
+import { WalletConnect } from "@/components/WalletConnect";
+import useSWR from "swr";
+import axios from "axios";
+import { getHiroApiBase } from "@/lib/stacks";
+import { Preferences, type Goal } from "@/components/Preferences";
+import { mockPools } from "@/lib/mockPools";
 
 export default function Home() {
+  const [address, setAddress] = useState<string | null>(null);
+
+  useEffect(() => {
+    // WalletConnect manages session; read from localStorage profile if present
+    try {
+      const raw = localStorage.getItem("blockstack-session");
+      if (raw) {
+        const session = JSON.parse(raw);
+        const stx = session?.userData?.profile?.stxAddress?.testnet as string | undefined;
+        setAddress(stx ?? null);
+      }
+    } catch {}
+  }, []);
+
+  const fetcher = (url: string) => axios.get(url).then(r => r.data);
+  const { data, isLoading, error } = useSWR(
+    address ? `${getHiroApiBase()}/extended/v1/address/${address}/balances` : null,
+    fetcher
+  );
+
+  const stxBalance = data?.stx?.balance ? Number(data.stx.balance) / 1e6 : null;
+  const [goal, setGoal] = useState<Goal>("yield");
+  const [minApy, setMinApy] = useState<number>(5);
+
+  const recommendations = mockPools
+    .filter(p => p.apy >= minApy)
+    .sort((a, b) => (goal === "yield" ? b.apy - a.apy : a.apy - b.apy))
+    .slice(0, 3);
+
   return (
     <div className={styles.page}>
       <main className={styles.main}>
-        <Image
-          className={styles.logo}
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol>
-          <li>
-            Get started by editing <code>src/app/page.tsx</code>.
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
-
-        <div className={styles.ctas}>
-          <a
-            className={styles.primary}
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className={styles.logo}
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-            className={styles.secondary}
-          >
-            Read our docs
-          </a>
+        <h1>Stacks Recommender</h1>
+        <WalletConnect />
+        <div style={{ marginTop: 16 }}>
+          <Preferences
+            onChange={({ goal, minApy }) => {
+              setGoal(goal);
+              setMinApy(minApy);
+            }}
+          />
+        </div>
+        {address && (
+          <div style={{ marginTop: 16 }}>
+            <div>Address: {address}</div>
+            {isLoading && <div>Loading balance…</div>}
+            {error && <div>Failed to load balance</div>}
+            {stxBalance !== null && <div>STX Balance: {stxBalance.toFixed(2)}</div>}
+          </div>
+        )}
+        <div style={{ marginTop: 24, width: "100%", maxWidth: 640 }}>
+          <h2>Recommendations</h2>
+          {recommendations.map(p => (
+            <div key={p.id} style={{ border: "1px solid #333", padding: 12, borderRadius: 8, marginBottom: 12 }}>
+              <div style={{ fontWeight: 600 }}>{p.name}</div>
+              <div>Platform: {p.platform}</div>
+              <div>Estimated APY: {p.apy}%</div>
+              <div>Risk: {p.risk}</div>
+              <div>
+                Why this: matches your goal {goal === "yield" ? "(maximize yield)" : goal === "low-risk" ? "(lower risk)" : "(hands-off)"} and minimum APY ≥ {minApy}.
+              </div>
+              <a href={p.url} target="_blank" rel="noreferrer">Open on {p.platform}</a>
+            </div>
+          ))}
+          {recommendations.length === 0 && <div>No options match your filters.</div>}
         </div>
       </main>
-      <footer className={styles.footer}>
-        <a
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
     </div>
   );
 }
