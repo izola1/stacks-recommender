@@ -28,6 +28,13 @@ An AI-assisted web app that analyzes your Stacks wallet balances and current DeF
 - Demo/pitch video: to be added in `docs/` with script and link.
 - Submission via DoraHacks with repo + live demo links.
 
+### DoraHacks Submission Steps
+1. Push this repo to GitHub (public).
+2. Deploy to Vercel: import the repo, set framework to Next.js, build defaults.
+3. Add live demo URL and repo to DoraHacks submission form.
+4. Record 60–90s demo using `docs/PITCH.md` as your script; upload and link.
+5. Ensure README has run instructions and links.
+
 ## Roadmap (MVP)
 - Wallet connect and STX balance (done)
 - Preferences: goal and minimum APY (done)

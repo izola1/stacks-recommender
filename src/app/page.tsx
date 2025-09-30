@@ -7,6 +7,8 @@ import axios from "axios";
 import { getHiroApiBase } from "@/lib/stacks";
 import { Preferences, type Goal } from "@/components/Preferences";
 import { mockPools } from "@/lib/mockPools";
+import { fetchAlexPools } from "@/lib/providers/alex";
+import { riskNote, scorePool } from "@/lib/risk";
 
 export default function Home() {
   const [address, setAddress] = useState<string | null>(null);
@@ -33,9 +35,19 @@ export default function Home() {
   const [goal, setGoal] = useState<Goal>("yield");
   const [minApy, setMinApy] = useState<number>(5);
 
-  const recommendations = mockPools
+  const { data: alexPools } = useSWR("alex-pools", async () => {
+    try {
+      return await fetchAlexPools();
+    } catch {
+      return mockPools;
+    }
+  });
+
+  const pools = alexPools ?? mockPools;
+
+  const recommendations = pools
     .filter(p => p.apy >= minApy)
-    .sort((a, b) => (goal === "yield" ? b.apy - a.apy : a.apy - b.apy))
+    .sort((a, b) => scorePool(b, goal) - scorePool(a, goal))
     .slice(0, 3);
 
   return (
@@ -67,9 +79,11 @@ export default function Home() {
               <div>Platform: {p.platform}</div>
               <div>Estimated APY: {p.apy}%</div>
               <div>Risk: {p.risk}</div>
+              <div>Score: {scorePool(p, goal).toFixed(0)}/100</div>
               <div>
                 Why this: matches your goal {goal === "yield" ? "(maximize yield)" : goal === "low-risk" ? "(lower risk)" : "(hands-off)"} and minimum APY ≥ {minApy}.
               </div>
+              <div>{riskNote(p)}</div>
               <a href={p.url} target="_blank" rel="noreferrer">Open on {p.platform}</a>
             </div>
           ))}
