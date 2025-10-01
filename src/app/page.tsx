@@ -38,6 +38,7 @@ export default function Home() {
   const mainBal = mainnet?.stx?.balance ? Number(mainnet.stx.balance) / 1e6 : 0;
   const testBal = testnet?.stx?.balance ? Number(testnet.stx.balance) / 1e6 : 0;
   const isMain = mainBal > testBal;
+  const selected = isMain ? mainnet : testnet;
   const stxBalance = (isMain ? mainBal : testBal) || null;
   const networkLabel = isMain ? "mainnet" : "testnet";
   const [goal, setGoal] = useState<Goal>("yield");
@@ -76,7 +77,23 @@ export default function Home() {
           <div style={{ marginTop: 16 }}>
             <div>Address: {address}</div>
             {(mErr || tErr) && <div>Failed to load balance</div>}
-            {stxBalance !== null && <div>STX Balance ({networkLabel}): {stxBalance.toFixed(2)}</div>}
+            {stxBalance !== null && <div>STX Balance ({networkLabel}): {stxBalance.toFixed(6)} STX</div>}
+            {selected?.stx?.locked && Number(selected.stx.locked) > 0 && (
+              <div>Locked: {(Number(selected.stx.locked) / 1e6).toFixed(6)} STX</div>
+            )}
+            {selected?.fungible_tokens && (
+              <div style={{ marginTop: 8 }}>
+                <div>Other tokens:</div>
+                <ul>
+                  {Object.entries(selected.fungible_tokens).slice(0,5).map(([k, v]: any) => (
+                    <li key={k}>
+                      {(v?.name || k)}: {v?.balance ? Number(v.balance) / Math.pow(10, v?.decimals || 0) : 0}
+                      {v?.symbol ? ` ${v.symbol}` : ""}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
         )}
         <div style={{ marginTop: 24, width: "100%", maxWidth: 640 }}>
