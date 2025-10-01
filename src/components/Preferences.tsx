@@ -12,6 +12,7 @@ export function Preferences(props: {
   const [minApy, setMinApy] = useState<number>(props.value?.minApy ?? 5);
 
   function emit() {
+    console.log("preferences: apply", { goal, minApy });
     props.onChange({ goal, minApy });
   }
 

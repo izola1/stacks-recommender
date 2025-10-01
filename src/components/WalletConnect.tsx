@@ -34,25 +34,34 @@ export function WalletConnect(props: { onConnected?: (address: string) => void; 
   }, []);
 
   function connect() {
-    showConnect({
-      appDetails: {
-        name: "Stacks Recommender",
-        icon: window.location.origin + "/favicon.ico",
-      },
-      redirectTo: "/",
-      userSession,
-      onFinish: () => {
-        const data = userSession.loadUserData();
-        const stx = data.profile?.stxAddress?.testnet as string | undefined;
-        if (stx) {
-          setAddress(stx);
-          props.onConnected?.(stx);
-        } else {
-          setAddress(null);
-        }
-      },
-      onCancel: () => {},
-    });
+    try {
+      console.log("connect: clicked");
+      showConnect({
+        appDetails: {
+          name: "Stacks Recommender",
+          icon: window.location.origin + "/favicon.ico",
+        },
+        redirectTo: "/",
+        userSession,
+        onFinish: () => {
+          console.log("connect: onFinish");
+          const data = userSession.loadUserData();
+          const stx = data.profile?.stxAddress?.testnet as string | undefined;
+          if (stx) {
+            setAddress(stx);
+            props.onConnected?.(stx);
+          } else {
+            setAddress(null);
+          }
+        },
+        onCancel: () => {
+          console.log("connect: cancelled");
+        },
+      });
+    } catch (e) {
+      console.warn("connect: showConnect failed, offering wallet install", e);
+      window.open("https://leather.io/", "_blank");
+    }
   }
 
   function signOut() {
@@ -69,7 +78,7 @@ export function WalletConnect(props: { onConnected?: (address: string) => void; 
           <button onClick={signOut}>Disconnect</button>
         </>
       ) : (
-        <button onClick={connect}>Connect Wallet</button>
+        <button type="button" onClick={connect}>Connect Wallet</button>
       )}
     </div>
   );
