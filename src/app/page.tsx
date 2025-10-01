@@ -26,12 +26,20 @@ export default function Home() {
   }, []);
 
   const fetcher = (url: string) => axios.get(url).then(r => r.data);
-  const { data, isLoading, error } = useSWR(
-    address ? `${getHiroApiBase()}/extended/v1/address/${address}/balances` : null,
+  const { data: mainnet, error: mErr } = useSWR(
+    address ? `${getHiroApiBase("mainnet")}/extended/v1/address/${address}/balances` : null,
+    fetcher
+  );
+  const { data: testnet, error: tErr } = useSWR(
+    address ? `${getHiroApiBase("testnet")}/extended/v1/address/${address}/balances` : null,
     fetcher
   );
 
-  const stxBalance = data?.stx?.balance ? Number(data.stx.balance) / 1e6 : null;
+  const mainBal = mainnet?.stx?.balance ? Number(mainnet.stx.balance) / 1e6 : 0;
+  const testBal = testnet?.stx?.balance ? Number(testnet.stx.balance) / 1e6 : 0;
+  const isMain = mainBal > testBal;
+  const stxBalance = (isMain ? mainBal : testBal) || null;
+  const networkLabel = isMain ? "mainnet" : "testnet";
   const [goal, setGoal] = useState<Goal>("yield");
   const [minApy, setMinApy] = useState<number>(5);
 
@@ -67,9 +75,8 @@ export default function Home() {
         {address && (
           <div style={{ marginTop: 16 }}>
             <div>Address: {address}</div>
-            {isLoading && <div>Loading balance…</div>}
-            {error && <div>Failed to load balance</div>}
-            {stxBalance !== null && <div>STX Balance: {stxBalance.toFixed(2)}</div>}
+            {(mErr || tErr) && <div>Failed to load balance</div>}
+            {stxBalance !== null && <div>STX Balance ({networkLabel}): {stxBalance.toFixed(2)}</div>}
           </div>
         )}
         <div style={{ marginTop: 24, width: "100%", maxWidth: 640 }}>
