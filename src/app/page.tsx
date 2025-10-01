@@ -44,15 +44,8 @@ export default function Home() {
 
   // Fetch STX price in USD (try 'stacks' then fallback 'blockstack')
   const priceFetcher = (url: string) => axios.get(url).then(r => r.data);
-  const { data: pricePrimary } = useSWR(
-    "stx-price-primary",
-    () => priceFetcher("https://api.coingecko.com/api/v3/simple/price?ids=stacks&vs_currencies=usd")
-  );
-  const { data: priceFallback } = useSWR(
-    pricePrimary?.stacks?.usd === undefined ? "stx-price-fallback" : null,
-    () => priceFetcher("https://api.coingecko.com/api/v3/simple/price?ids=blockstack&vs_currencies=usd")
-  );
-  const stxUsd = pricePrimary?.stacks?.usd ?? priceFallback?.blockstack?.usd ?? null;
+  const { data: priceData } = useSWR("/api/price/stx", priceFetcher);
+  const stxUsd = priceData?.usd ?? null;
   const balanceUsd = stxUsd && stxBalance !== null ? stxUsd * stxBalance : null;
   const [goal, setGoal] = useState<Goal>("yield");
   const [minApy, setMinApy] = useState<number>(5);
