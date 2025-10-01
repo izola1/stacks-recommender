@@ -41,6 +41,19 @@ export default function Home() {
   const selected = isMain ? mainnet : testnet;
   const stxBalance = (isMain ? mainBal : testBal) || null;
   const networkLabel = isMain ? "mainnet" : "testnet";
+
+  // Fetch STX price in USD (try 'stacks' then fallback 'blockstack')
+  const priceFetcher = (url: string) => axios.get(url).then(r => r.data);
+  const { data: pricePrimary } = useSWR(
+    "stx-price-primary",
+    () => priceFetcher("https://api.coingecko.com/api/v3/simple/price?ids=stacks&vs_currencies=usd")
+  );
+  const { data: priceFallback } = useSWR(
+    pricePrimary?.stacks?.usd === undefined ? "stx-price-fallback" : null,
+    () => priceFetcher("https://api.coingecko.com/api/v3/simple/price?ids=blockstack&vs_currencies=usd")
+  );
+  const stxUsd = pricePrimary?.stacks?.usd ?? priceFallback?.blockstack?.usd ?? null;
+  const balanceUsd = stxUsd && stxBalance !== null ? stxUsd * stxBalance : null;
   const [goal, setGoal] = useState<Goal>("yield");
   const [minApy, setMinApy] = useState<number>(5);
 
@@ -77,7 +90,14 @@ export default function Home() {
           <div style={{ marginTop: 16 }}>
             <div>Address: {address}</div>
             {(mErr || tErr) && <div>Failed to load balance</div>}
-            {stxBalance !== null && <div>STX Balance ({networkLabel}): {stxBalance.toFixed(6)} STX</div>}
+            {stxBalance !== null && (
+              <div>
+                STX Balance ({networkLabel}): {stxBalance.toFixed(6)} STX
+                {balanceUsd !== null && (
+                  <span> (~${balanceUsd.toFixed(2)} USD)</span>
+                )}
+              </div>
+            )}
             {selected?.stx?.locked && Number(selected.stx.locked) > 0 && (
               <div>Locked: {(Number(selected.stx.locked) / 1e6).toFixed(6)} STX</div>
             )}
