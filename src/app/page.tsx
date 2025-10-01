@@ -45,7 +45,7 @@ export default function Home() {
   // Fetch STX price in USD (try 'stacks' then fallback 'blockstack')
   const priceFetcher = (url: string) => axios.get(url).then(r => r.data);
   const { data: priceData } = useSWR("/api/price/stx", priceFetcher);
-  const effectiveUsd = typeof priceData?.usd === "number" && priceData.usd > 0 ? priceData.usd : 0.6; // fallback
+  const effectiveUsd = typeof priceData?.usd === "number" && isFinite(priceData.usd) && priceData.usd >= 0.01 && priceData.usd <= 10 ? priceData.usd : 0.6;
   const balanceUsd = stxBalance !== null ? effectiveUsd * stxBalance : null;
   const [goal, setGoal] = useState<Goal>("yield");
   const [minApy, setMinApy] = useState<number>(5);

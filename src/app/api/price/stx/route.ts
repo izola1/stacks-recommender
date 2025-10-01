@@ -39,7 +39,8 @@ export async function GET() {
         usd = Number.isFinite(val) ? val : null;
       } catch {}
     }
-    return NextResponse.json({ usd }, { status: 200 });
+    const sanitized = typeof usd === "number" && isFinite(usd) && usd >= 0.01 && usd <= 10 ? usd : 0.6;
+    return NextResponse.json({ usd: sanitized }, { status: 200 });
   } catch (e) {
     return NextResponse.json({ usd: null }, { status: 200 });
   }
