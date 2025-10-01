@@ -53,14 +53,6 @@ export function WalletConnect(props: { onConnected?: (address: string) => void; 
         alert("No Stacks wallet detected. Please install Leather (leather.io) and try again.");
         return;
       }
-      // Request permissions if supported
-      try {
-        await provider.request?.("wallet_requestPermissions", {
-          permissions: ["stx:addresses"],
-        });
-      } catch (permErr) {
-        console.warn("connect: wallet_requestPermissions not supported or declined", permErr);
-      }
       const res = await provider.request?.("stx_getAddresses");
       const addr: string | undefined = res?.addresses?.find?.((a: any) => a?.symbol === "STX")?.address
         || res?.addresses?.[0]?.address
