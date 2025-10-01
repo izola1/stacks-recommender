@@ -54,9 +54,10 @@ export default function Home() {
     <div className={styles.page}>
       <main className={styles.main}>
         <h1>Stacks Recommender</h1>
-        <WalletConnect />
+        <WalletConnect onConnected={(addr) => setAddress(addr)} onDisconnected={() => setAddress(null)} />
         <div style={{ marginTop: 16 }}>
           <Preferences
+            value={{ goal, minApy }}
             onChange={({ goal, minApy }) => {
               setGoal(goal);
               setMinApy(minApy);
