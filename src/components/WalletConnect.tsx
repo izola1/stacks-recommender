@@ -34,7 +34,9 @@ export function WalletConnect(props: { onConnected?: (address: string) => void; 
       // Try provider directly to get current addresses
       const provider: any = (window as any).LeatherProvider || (window as any).StacksProvider;
       provider?.request?.("stx_getAddresses").then((res: any) => {
-        const stxAddr: string | undefined = res?.addresses?.find?.((a: any) => a?.symbol === "STX")?.address
+        const addresses = res?.result?.addresses || res?.addresses;
+        const stxAddr: string | undefined = addresses?.find?.((a: any) => a?.symbol === "STX")?.address
+          || res?.result?.address
           || res?.address;
         if (stxAddr) {
           setAddress(stxAddr);
@@ -54,8 +56,10 @@ export function WalletConnect(props: { onConnected?: (address: string) => void; 
         return;
       }
       const res = await provider.request?.("stx_getAddresses");
-      const addr: string | undefined = res?.addresses?.find?.((a: any) => a?.symbol === "STX")?.address
-        || res?.addresses?.[0]?.address
+      const addresses = res?.result?.addresses || res?.addresses;
+      const addr: string | undefined = addresses?.find?.((a: any) => a?.symbol === "STX")?.address
+        || addresses?.[0]?.address
+        || res?.result?.address
         || res?.address;
       if (addr) {
         setAddress(addr);
