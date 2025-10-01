@@ -49,8 +49,8 @@ export function WalletConnect(props: { onConnected?: (address: string) => void; 
     try {
       const provider: any = (window as any).LeatherProvider || (window as any).StacksProvider;
       if (!provider) {
-        console.warn("connect: no provider found, redirecting to install");
-        window.open("https://leather.io/", "_blank");
+        console.warn("connect: no provider found (install Leather/Hiro)");
+        alert("No Stacks wallet detected. Please install Leather (leather.io) and try again.");
         return;
       }
       await provider.request?.("stx_connect", {
@@ -80,8 +80,8 @@ export function WalletConnect(props: { onConnected?: (address: string) => void; 
       }
       console.warn("connect: no address returned from provider or session");
     } catch (e) {
-      console.warn("connect: provider flow failed, offering wallet install", e);
-      window.open("https://leather.io/", "_blank");
+      console.warn("connect: provider flow failed", e);
+      alert("Wallet connection failed. Check your wallet is unlocked and try again.");
     }
   }
 
