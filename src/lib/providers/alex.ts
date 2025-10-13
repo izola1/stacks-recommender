@@ -31,22 +31,44 @@ function riskFromLiquidity(liq?: number): "low" | "medium" | "high" {
   return "low";
 }
 
+// Simple in-memory cache to reduce load and smooth over transient failures
+let lastAlexPools: Pool[] | null = null;
+let lastAlexAt = 0;
+const ALEX_CACHE_MS = 60 * 1000; // 60s
+
 export async function fetchAlexPools(): Promise<Pool[]> {
+  const now = Date.now();
+  if (lastAlexPools && now - lastAlexAt < ALEX_CACHE_MS) {
+    return lastAlexPools;
+  }
   const url = "https://api.alexgo.io/v1/tickers";
-  const res = await axios.get<AlexTicker[]>(url, { timeout: 10000 });
-  const tickers = res.data || [];
-  return tickers.slice(0, 50).map((t): Pool => {
-    const apy = estimateApyFromFees(t) ?? 0;
-    const name = `ALEX ${t.base}/${t.target}`;
-    return {
-      id: t.ticker_id,
-      name,
-      platform: "ALEX",
-      apy: Number(apy.toFixed(2)),
-      risk: riskFromLiquidity(t.liquidity_in_usd),
-      url: "https://app.alexlab.co/pools",
-    };
-  });
+  try {
+    const res = await axios.get<AlexTicker[]>(url, { timeout: 10000 });
+    const tickers = Array.isArray(res.data) ? res.data : [];
+    const pools = tickers.slice(0, 50).map((t): Pool => {
+      const apy = estimateApyFromFees(t) ?? 0;
+      const name = `ALEX ${t.base}/${t.target}`;
+      return {
+        id: t.ticker_id,
+        name,
+        platform: "ALEX",
+        apy: Number(apy.toFixed(2)),
+        risk: riskFromLiquidity(t.liquidity_in_usd),
+        url: "https://app.alexlab.co/pools",
+        liquidityUsd: t.liquidity_in_usd,
+        volume24hUsd: Math.max(0, (t.base_volume * t.last_price) + t.target_volume),
+      };
+    });
+    lastAlexPools = pools;
+    lastAlexAt = now;
+    return pools;
+  } catch {
+    // On failure, serve cached data if fresh
+    if (lastAlexPools && now - lastAlexAt < ALEX_CACHE_MS * 5) {
+      return lastAlexPools;
+    }
+    return [];
+  }
 }
 
 

@@ -1,10 +1,20 @@
 export type Pool = {
   id: string;
   name: string;
-  platform: "ALEX" | "Other";
+  platform: string; // Allow any protocol name
   apy: number; // percent
   risk: "low" | "medium" | "high";
   url: string;
+  // Optional metadata to improve scoring/explainability
+  liquidityUsd?: number;
+  volume24hUsd?: number;
+};
+
+export type FungibleToken = {
+  name?: string;
+  symbol?: string;
+  balance?: string | number;
+  decimals?: number;
 };
 
 export const mockPools: Pool[] = [

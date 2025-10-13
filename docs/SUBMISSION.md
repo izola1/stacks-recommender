@@ -6,6 +6,7 @@
   - Repo: <add GitHub URL>
   - Live demo: <add Vercel URL>
   - Video: <add YouTube/Drive link>
+  - Screenshots: `docs/screenshot-1.png`, `docs/screenshot-2.png`
 - Built on Stacks:
   - Wallet connect via `@stacks/connect`
   - Hiro API for balances/positions
@@ -16,6 +17,12 @@
   npm run dev
   ```
 - Screenshots: add after deployment
+
+## Reviewer Quick-Test Checklist
+- Connect wallet and verify STX balance appears with USD and price source.
+- Set goal/min APY; click Apply and see ranked recommendations.
+- Click a recommendation link; confirm it opens the protocol’s page.
+- Trigger AI advice; verify a Groq-backed response is returned.
 
 ## Judging Criteria Mapping
 - Technical quality: live data ingestion (ALEX/Hiro), UI, scoring, explainability

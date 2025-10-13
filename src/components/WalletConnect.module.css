@@ -1,0 +1,9 @@
+.walletConnectRow {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.error {
+    color: red;
+}
