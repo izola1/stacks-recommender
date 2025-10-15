@@ -1,91 +1,353 @@
-// /src/app/api/recommendations/route.ts
 import { NextResponse } from "next/server";
 import axios from "axios";
 
 export async function POST(req: Request) {
   try {
-    const { goal, minApy = 0, limit = 6 } = await req.json();
+    const { goal = "yield", minApy = 0, limit = 6 } = await req.json();
 
-    // 🪙 4 Stacks-aligned DeFi APIs
-    const sources = [
-      { name: "Alex", url: "https://api.alexgo.io/v1/tickers" },
-      { name: "Arkadiko", url: "https://arkadiko-api.herokuapp.com/api/v1/tickers" },
-      { name: "Velar", url: "https://api.velar.co/pools" },
-      { name: "Bitflow", url: "https://bitflow-sdk-api-gateway-7owjsmt8.uc.gateway.dev/ticker" },
-    ];
+    // 🔗 Fetch Velar pools
+    const res = await axios.get("https://api.velar.co/pools/");
+    const pools = Array.isArray(res.data) ? res.data : res.data?.data || [];
 
-    // Fetch all concurrently
-    const results = await Promise.allSettled(
-      sources.map((s) => axios.get(s.url).then((res) => ({ ...s, data: res.data })))
-    );
+    // 🧩 Normalize Velar pool data
+    const normalized = pools.map((p: any) => {
+      const apy = Math.max(0, Number(p?.stats?.apy ?? 0));
+      const tvl = Math.max(0, Number(p?.stats?.tvl_usd?.value ?? 0));
 
-    // Normalize and combine
-    const allMarkets = results.flatMap((r) => {
-      if (r.status !== "fulfilled") return [];
-      const { name, data } = r.value;
-      return normalizeData(name, data);
+      return {
+        id: p.lpTokenContractAddress || p.symbol,
+        platform: "Velar",
+        name: p.symbol || `${p.token0Symbol}/${p.token1Symbol}`,
+        apy,
+        tvl,
+        risk: apy > 30 ? "high" : apy > 10 ? "medium" : "low",
+        url: `https://app.velar.io/pool/${p.lpTokenContractAddress}`,
+      };
     });
 
-    // Filter and sort
-    const filtered = allMarkets
-      .filter((m) => m.apy >= minApy)
-      .sort((a, b) => b.apy - a.apy)
+    // 🧮 Apply APY filter (≥ minApy)
+    let filtered = normalized
+      .filter((p: { apy: number }) => p.apy >= minApy)
+      .sort((a: { apy: number }, b: { apy: number }) => b.apy - a.apy)
       .slice(0, limit);
 
-    return NextResponse.json({ result: filtered, count: filtered.length });
+    let message = `Showing pools with APY ≥ ${minApy}%.`;
+
+    // 🪄 Graceful fallback if no matches
+    if (filtered.length === 0) {
+      filtered = normalized
+        .sort((a: { apy: number }, b: { apy: number }) => b.apy - a.apy)
+        .slice(0, limit);
+      message = `No pools matched your APY ≥ ${minApy}%. Showing top ${filtered.length} pools instead.`;
+    }
+
+    // ✨ NEW: Ask AI to analyze these pools
+    let aiSummary = "No AI insights available.";
+    try {
+      const aiRes = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/analyze`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          goal,
+          minApy,
+          pools: filtered,
+        }),
+      });
+
+      if (aiRes.ok) {
+        const aiData = await aiRes.json();
+        aiSummary = aiData.summary || aiSummary;
+      }
+    } catch (err) {
+      console.warn("⚠️ AI reasoning layer failed:", err.message);
+    }
+
+    // ✅ Return combined response
+    return NextResponse.json({
+      result: filtered,
+      count: filtered.length,
+      message,
+      aiSummary,
+    });
   } catch (err: any) {
-    console.error("❌ Recommendation API Error:", err);
-    return NextResponse.json({ error: "Failed to fetch recommendations" }, { status: 500 });
+    console.error("❌ Velar Recommendation API Error:", err.message);
+    return NextResponse.json(
+      { error: "Failed to fetch recommendations from Velar." },
+      { status: 500 }
+    );
   }
 }
 
-// 🔧 Normalize various APIs into a unified format
-function normalizeData(platform: string, data: any): any[] {
-  switch (platform) {
-    case "Alex":
-      return (data?.data || []).map((d: any) => ({
-        id: `alex-${d.symbol}`,
-        platform,
-        name: d.symbol,
-        apy: parseFloat(d.apy || 0),
-        tvl: parseFloat(d.tvl || 0),
-        risk: "medium",
-        url: "https://app.alexgo.io/",
-      }));
-    case "Arkadiko":
-      return (data || []).map((d: any) => ({
-        id: `arkadiko-${d.ticker || d.name}`,
-        platform,
-        name: d.ticker || d.name,
-        apy: parseFloat(d.apy || 0),
-        tvl: parseFloat(d.tvl_usd || 0),
-        risk: "low",
-        url: "https://app.arkadiko.finance/",
-      }));
-    case "Velar":
-      return (data?.pools || []).map((d: any) => ({
-        id: `velar-${d.pool_id}`,
-        platform,
-        name: `${d.token0.symbol}/${d.token1.symbol}`,
-        apy: parseFloat(d.apy || 0),
-        tvl: parseFloat(d.tvl_usd || 0),
-        risk: "medium",
-        url: "https://app.velar.io/",
-      }));
-    case "Bitflow":
-      return (data?.result || []).map((d: any) => ({
-        id: `bitflow-${d.symbol}`,
-        platform,
-        name: d.symbol,
-        apy: parseFloat(d.apy || 0),
-        tvl: parseFloat(d.tvl || 0),
-        risk: "medium",
-        url: "https://app.bitflow.finance/",
-      }));
-    default:
-      return [];
-  }
-}
+
+
+// import { NextResponse } from "next/server";
+// import axios from "axios";
+
+// export async function POST(req: Request) {
+//   try {
+//     const { minApy = 0, limit = 6 } = await req.json();
+
+//     // 🔗 Fetch Velar pools
+//     const res = await axios.get("https://api.velar.co/pools/");
+//     const pools = Array.isArray(res.data) ? res.data : res.data?.data || [];
+
+//     // 🧩 Normalize Velar pool data
+//     const normalized = pools.map((p: any) => {
+//       const apy = Math.max(0, Number(p?.stats?.apy ?? 0));
+//       const tvl = Math.max(0, Number(p?.stats?.tvl_usd?.value ?? 0));
+
+//       return {
+//         id: p.lpTokenContractAddress || p.symbol,
+//         platform: "Velar",
+//         name: p.symbol || `${p.token0Symbol}/${p.token1Symbol}`,
+//         apy,
+//         tvl,
+//         risk: apy > 30 ? "high" : apy > 10 ? "medium" : "low",
+//         url: `https://app.velar.io/pool/${p.lpTokenContractAddress}`,
+//       };
+//     });
+
+//     // 🧮 Apply APY filter (≥ minApy)
+//     let filtered = normalized
+//       .filter((p: { apy: number }) => p.apy >= minApy)
+//       .sort((a: { apy: number }, b: { apy: number }) => b.apy - a.apy)
+//       .slice(0, limit);
+
+//     // 🪄 Graceful fallback if no matches
+//     if (filtered.length === 0) {
+//       filtered = normalized
+//         .sort((a: { apy: number }, b: { apy: number }) => b.apy - a.apy)
+//         .slice(0, limit);
+//       return NextResponse.json({
+//         result: filtered,
+//         count: filtered.length,
+//         message: `No pools matched your APY ≥ ${minApy}%. Showing top ${filtered.length} pools instead.`,
+//       });
+//     }
+
+//     return NextResponse.json({
+//       result: filtered,
+//       count: filtered.length,
+//       message: `Showing pools with APY ≥ ${minApy}%.`,
+//     });
+//   } catch (err: any) {
+//     console.error("❌ Velar Recommendation API Error:", err.message);
+//     return NextResponse.json(
+//       { error: "Failed to fetch recommendations from Velar." },
+//       { status: 500 }
+//     );
+//   }
+// }
+
+
+// import { NextResponse } from "next/server";
+// import axios from "axios";
+
+// export async function POST(req: Request) {
+//   try {
+//     const { minApy = 0, limit = 6 } = await req.json();
+
+//     // 🔗 Fetch Velar pools
+//     const res = await axios.get("https://api.velar.co/pools/");
+//     const pools = Array.isArray(res.data) ? res.data : res.data?.data || [];
+
+//     // 🧩 Normalize Velar pool data
+//     const normalized = pools.map((p: any) => {
+//       const apy = Number(p?.stats?.apy ?? 0);
+//       const tvl = Number(p?.stats?.tvl_usd?.value ?? 0);
+
+//       return {
+//         id: p.lpTokenContractAddress || p.symbol,
+//         platform: "Velar",
+//         name: p.symbol || `${p.token0Symbol}/${p.token1Symbol}`,
+//         apy,
+//         tvl,
+//         risk: apy > 30 ? "high" : apy > 10 ? "medium" : "low",
+//         url: `https://app.velar.io/pool/${p.lpTokenContractAddress}`,
+//       };
+//     });
+
+//     // 🧮 Apply APY filter (≤ minApy)
+//     let filtered = normalized
+//       .filter((p: { apy: number }) => p.apy <= minApy)
+//       .sort((a: { apy: number }, b: { apy: number }) => b.apy - a.apy)
+//       .slice(0, limit);
+
+//     // 🪄 Graceful fallback if no matches
+//     if (filtered.length === 0) {
+//       filtered = normalized.sort((a: { apy: number }, b: { apy: number }) => b.apy - a.apy).slice(0, limit);
+//       return NextResponse.json({
+//         result: filtered,
+//         count: filtered.length,
+//         message: `No pools matched your ${minApy}% APY filter — showing top ${filtered.length} available pools instead.`,
+//       });
+//     }
+
+//     return NextResponse.json({
+//       result: filtered,
+//       count: filtered.length,
+//       message: `Showing pools with APY ≤ ${minApy}%`,
+//     });
+//   } catch (err: any) {
+//     console.error("❌ Velar Recommendation API Error:", err.message);
+//     return NextResponse.json(
+//       { error: "Failed to fetch recommendations from Velar." },
+//       { status: 500 }
+//     );
+//   }
+// }
+
+
+
+// import { NextResponse } from "next/server";
+// import axios from "axios";
+
+// export async function POST(req: Request) {
+//   try {
+//     const { minApy = 0, limit = 6 } = await req.json();
+
+//     // 🔗 Fetch Velar pools
+//     const res = await axios.get("https://api.velar.co/pools/");
+//     const pools = Array.isArray(res.data) ? res.data : [];
+
+//     // 🧩 Normalize Velar pool data
+//     const normalized = pools.map((p: any) => {
+//       const apy = Number(p?.stats?.apy ?? 0);
+//       const tvl = Number(p?.tvl_usd?.value ?? 0);
+
+//       return {
+//         id: p.lpTokenContractAddress || p.symbol,
+//         platform: "Velar",
+//         name: p.symbol || `${p.token0Symbol}/${p.token1Symbol}`,
+//         apy,
+//         tvl,
+//         risk: apy > 30 ? "high" : apy > 10 ? "medium" : "low",
+//         url: `https://app.velar.com/pool/${p.lpTokenContractAddress}`,
+//       };
+//     });
+
+//     // 🧮 Apply APY filter
+//     let filtered = normalized
+//       .filter((p) => p.apy >= minApy)
+//       .sort((a, b) => b.apy - a.apy)
+//       .slice(0, limit);
+
+//     // 🪄 Graceful fallback if filter is too strict
+//     if (filtered.length === 0) {
+//       const topFallback = normalized
+//         .sort((a, b) => b.apy - a.apy)
+//         .slice(0, limit);
+
+//       return NextResponse.json({
+//         result: topFallback,
+//         count: topFallback.length,
+//         message: `No pools met your ${minApy}% APY filter — showing top ${topFallback.length} pools instead.`,
+//       });
+//     }
+
+//     return NextResponse.json({
+//       result: filtered,
+//       count: filtered.length,
+//     });
+//   } catch (err: any) {
+//     console.error("❌ Velar Recommendation API Error:", err.message);
+//     return NextResponse.json(
+//       { error: "Failed to fetch recommendations from Velar." },
+//       { status: 500 }
+//     );
+//   }
+// }
+
+
+
+// // /src/app/api/recommendations/route.ts
+// import { NextResponse } from "next/server";
+// import axios from "axios";
+
+// export async function POST(req: Request) {
+//   try {
+//     const { goal, minApy = 0, limit = 6 } = await req.json();
+
+//     // 🪙 4 Stacks-aligned DeFi APIs
+//     const sources = [
+//       { name: "Alex", url: "https://api.alexgo.io/v1/tickers" },
+//       { name: "Arkadiko", url: "https://arkadiko-api.herokuapp.com/api/v1/tickers" },
+//       { name: "Velar", url: "https://api.velar.co/pools" },
+//       { name: "Bitflow", url: "https://bitflow-sdk-api-gateway-7owjsmt8.uc.gateway.dev/ticker" },
+//     ];
+
+//     // Fetch all concurrently
+//     const results = await Promise.allSettled(
+//       sources.map((s) => axios.get(s.url).then((res) => ({ ...s, data: res.data })))
+//     );
+
+//     // Normalize and combine
+//     const allMarkets = results.flatMap((r) => {
+//       if (r.status !== "fulfilled") return [];
+//       const { name, data } = r.value;
+//       return normalizeData(name, data);
+//     });
+
+//     // Filter and sort
+//     const filtered = allMarkets
+//       .filter((m) => m.apy >= minApy)
+//       .sort((a, b) => b.apy - a.apy)
+//       .slice(0, limit);
+
+//     return NextResponse.json({ result: filtered, count: filtered.length });
+//   } catch (err: any) {
+//     console.error("❌ Recommendation API Error:", err);
+//     return NextResponse.json({ error: "Failed to fetch recommendations" }, { status: 500 });
+//   }
+// }
+
+// // 🔧 Normalize various APIs into a unified format
+// function normalizeData(platform: string, data: any): any[] {
+//   switch (platform) {
+//     case "Alex":
+//       return (data?.data || []).map((d: any) => ({
+//         id: `alex-${d.symbol}`,
+//         platform,
+//         name: d.symbol,
+//         apy: parseFloat(d.apy || 0),
+//         tvl: parseFloat(d.tvl || 0),
+//         risk: "medium",
+//         url: "https://app.alexgo.io/",
+//       }));
+//     case "Arkadiko":
+//       return (data || []).map((d: any) => ({
+//         id: `arkadiko-${d.ticker || d.name}`,
+//         platform,
+//         name: d.ticker || d.name,
+//         apy: parseFloat(d.apy || 0),
+//         tvl: parseFloat(d.tvl_usd || 0),
+//         risk: "low",
+//         url: "https://app.arkadiko.finance/",
+//       }));
+//     case "Velar":
+//       return (data?.pools || []).map((d: any) => ({
+//         id: `velar-${d.pool_id}`,
+//         platform,
+//         name: `${d.token0.symbol}/${d.token1.symbol}`,
+//         apy: parseFloat(d.apy || 0),
+//         tvl: parseFloat(d.tvl_usd || 0),
+//         risk: "medium",
+//         url: "https://app.velar.io/",
+//       }));
+//     case "Bitflow":
+//       return (data?.result || []).map((d: any) => ({
+//         id: `bitflow-${d.symbol}`,
+//         platform,
+//         name: d.symbol,
+//         apy: parseFloat(d.apy || 0),
+//         tvl: parseFloat(d.tvl || 0),
+//         risk: "medium",
+//         url: "https://app.bitflow.finance/",
+//       }));
+//     default:
+//       return [];
+//   }
+// }
 
 
 

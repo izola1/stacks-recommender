@@ -17,7 +17,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className="relative text-gray-100 font-inter min-h-screen flex overflow-hidden">
+      <body suppressHydrationWarning className="relative text-gray-100 font-inter min-h-screen flex overflow-hidden">
         {/* 🌌 Animated Aurora Background */}
         <div className="aurora-bg"></div>
 
